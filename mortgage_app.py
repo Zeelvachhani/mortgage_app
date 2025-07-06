@@ -175,6 +175,7 @@ def get_summary_points(df, years=[1, 2, 3, 4, 5, 10, 15, 20, 25, 30]):
         })
     return pd.DataFrame(result)
 
+
 summary_a = get_summary_points(loan_a_df)
 summary_b = get_summary_points(loan_b_df)
 
@@ -186,10 +187,20 @@ summary_final["Loan B: Total Payment"] = summary_b["Total Payment"]
 summary_final["Loan B: Interest"] = summary_b["Total Interest"]
 summary_final["Loan B: Balance"] = summary_b["Remaining Balance"]
 
+def format_currency(df):
+    currency_cols = [col for col in df.columns if "Payment" in col or "Interest" in col or "Balance" in col]
+    for col in currency_cols:
+        df[col] = df[col].apply(lambda x: f"${x:,.0f}")
+    return df
+
+summary_display = format_currency(summary_final.copy())
+
+
 # -------------------------------
 # Display Results
 # -------------------------------
 st.header("📋 Loan Comparison Summary")
+
 
 def display_loan_details(title, home_price, down_payment, rate, discount_points, closing_cost, pmi_rate, pmi_start, monthly_payment, df):
     st.subheader(title)
@@ -242,5 +253,27 @@ with col2:
     )
 
 
+# Format columns as currency strings
+def format_currency(df):
+    currency_cols = [col for col in df.columns if "Payment" in col or "Interest" in col or "Balance" in col]
+    for col in currency_cols:
+        df[col] = df[col].apply(lambda x: f"${x:,.0f}")
+    return df
+
+# Format summary for display
+summary_display = format_currency(summary_final.copy())
+
+# 📊 Display formatted loan summary table
 st.subheader("📊 Loan Performance Over Time")
-st.dataframe(summary_final.set_index("Year"))
+st.dataframe(summary_display.set_index("Year"))
+
+# 📈 Optional: Bar chart comparing total payments over time
+st.subheader("📈 Total Payment Comparison Over Time")
+chart_data = pd.DataFrame({
+    "Year": summary_final["Year"],
+    "Loan A": summary_final["Loan A: Total Payment"],
+    "Loan B": summary_final["Loan B: Total Payment"]
+})
+chart_data.set_index("Year", inplace=True)
+st.bar_chart(chart_data)
+
