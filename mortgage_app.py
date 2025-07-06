@@ -61,21 +61,65 @@ def amortization_schedule(loan_amount, annual_rate, term_years, home_price, star
 
     return pd.DataFrame(schedule)
 
+
 # -------------------------------
 # Auto-Generate Loan A and B or Manual Input
 # -------------------------------
 term_years = 30
 months = term_years * 12
 
+def find_best_down_payment(home_price, max_down_pct, total_cash, max_monthly, pmi_rate, rate, term_years):
+    months = term_years * 12
+    max_down_payment = min(home_price * max_down_pct / 100, total_cash)
+    
+    # We'll try down payments from max down payment down to 3% of home price, decrementing by $10 steps for speed
+    step = 10
+    min_down_payment = home_price * 0.03  # 3%
+    
+    best_down_payment = None
+    best_monthly_payment = None
+    
+    for dp in range(int(max_down_payment), int(min_down_payment) - 1, -step):
+        loan_amount = home_price - dp
+        monthly_rate = rate / 12
+        payment = npf.pmt(monthly_rate, months, -loan_amount)
+        
+        # PMI monthly if LTV > 80%
+        pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
+        total_monthly = payment + pmi
+        
+        if total_monthly <= max_monthly:
+            best_down_payment = dp
+            best_monthly_payment = payment
+            break  # Found highest valid down payment
+    
+    # If no valid down payment found, fallback to min_down_payment anyway (even if invalid)
+    if best_down_payment is None:
+        best_down_payment = min_down_payment
+        best_monthly_payment = npf.pmt(rate / 12, months, -(home_price - best_down_payment))
+    
+    return best_down_payment, best_monthly_payment
+
+
 if not manual_override:
     # --- Loan A ---
-    down_payment_a = min(home_price * max_down_pct / 100, total_cash)
-    loan_amount_a = home_price - down_payment_a
+    # --- Loan A ---
     rate_a = 0.065
-    monthly_rate_a = rate_a / 12
-    monthly_payment_a = npf.pmt(monthly_rate_a, months, -loan_amount_a)
+    
+    down_payment_a, monthly_payment_a = find_best_down_payment(
+        home_price=home_price,
+        max_down_pct=max_down_pct,
+        total_cash=total_cash,
+        max_monthly=max_monthly,
+        pmi_rate=pmi_rate,
+        rate=rate_a,
+        term_years=term_years
+    )
+    
+    loan_amount_a = home_price - down_payment_a
     discount_points_a = 0
     extra_costs_a = 0
+
 
     # --- Loan B ---
     min_down_b = max(home_price * 0.0351, home_price * 0.03)
