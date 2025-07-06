@@ -160,7 +160,7 @@ def count_pmi_months(df):
 # -------------------------------
 # Generate Summary Data
 # -------------------------------
-def get_summary_points(df, years=[3, 5, 10, 15, 30]):
+def get_summary_points(df, years=[1, 2, 3, 4, 5, 10, 15, 20, 25, 30]):
     result = []
     for yr in years:
         slice_df = df[df["Year"] < yr]
