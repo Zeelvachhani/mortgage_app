@@ -125,7 +125,7 @@ def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate
 if not manual_override:
     # --- Loan A ---
     base_rate_a = 0.065
-
+    
     loan_a_config = find_best_loan_a(
         home_price=home_price,
         max_down_pct=max_down_pct,
@@ -134,6 +134,7 @@ if not manual_override:
         pmi_rate=pmi_rate,
         base_rate=base_rate_a,
         term_years=term_years
+    
     )
 
     if loan_a_config is not None:
@@ -155,6 +156,7 @@ if not manual_override:
         )
     else:
         loan_a_valid = False
+
 
 
     # --- Loan B ---
@@ -191,7 +193,7 @@ else:
 # -------------------------------
 # Validate Loan Configs
 # -------------------------------
-loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a, home_price, pmi_rate)
+# loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a, home_price, pmi_rate)
 loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b, home_price, pmi_rate)
 
 if not loan_a_valid or not loan_b_valid:
