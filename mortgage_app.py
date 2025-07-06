@@ -16,9 +16,9 @@ st.sidebar.header("🔍 Input Constraints")
 
 total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000)
 max_monthly = st.sidebar.number_input("Max Monthly Payment ($)", value=5000)
-max_down_pct = st.sidebar.slider("Max Down Payment (%)", 3.0, 100.0, 25.0)
+max_down_pct = st.sidebar.number_input("Max Down Payment (%)", min_value=3.0, max_value=100.0,, step=1.0)
 home_price = st.sidebar.number_input("Home Price ($)", value=800000)
-pmi_rate = st.sidebar.number_input("PMI Rate (%)", min_value=0.0, value=0.5, step=0.01) / 100
+pmi_rate = st.sidebar.number_input("PMI Rate (%)", min_value=0.2, max_value=2.0, value=0.5, step=0.01) / 100
 manual_override = st.sidebar.checkbox("🔧 Manually Enter Loan A and Loan B?")
 
 # -------------------------------
@@ -110,18 +110,22 @@ else:
 # -------------------------------
 # Validate Inputs - Show No Scenario if invalid
 # -------------------------------
-def valid_loan(loan_amount, monthly_payment, max_monthly, total_cash, down_payment):
-    # Basic validations - loan amount, payment positive and monthly below max, down payment below cash
+def valid_loan(loan_amount, monthly_payment, max_monthly, total_cash, down_payment, home_price, pmi_rate):
     if loan_amount <= 0:
         return False
-    if monthly_payment <= 0 or monthly_payment > max_monthly:
+    # Estimate PMI based on LTV > 80%
+    pmi = loan_amount * pmi_rate if (loan_amount / home_price) > 0.80 else 0
+    total_monthly = monthly_payment + pmi
+    if total_monthly > max_monthly or total_monthly <= 0:
         return False
     if down_payment > total_cash:
         return False
     return True
 
-loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a)
-loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b)
+
+loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a, home_price, pmi_rate)
+loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b, home_price, pmi_rate)
+
 
 if not loan_a_valid or not loan_b_valid:
     st.error("⚠️ No scenario found for one or both loans with the current inputs.")
