@@ -143,8 +143,19 @@ if not manual_override:
         monthly_payment_a = loan_a_config["monthly_payment"]
         discount_points_a = loan_a_config["points"]
         extra_costs_a = loan_a_config["extra_costs"]
+    
+        loan_a_valid = valid_loan(
+            loan_amount=loan_amount_a,
+            monthly_payment=monthly_payment_a,
+            max_monthly=max_monthly,
+            total_cash=total_cash,
+            down_payment=down_payment_a,
+            home_price=home_price,
+            pmi_rate=pmi_rate
+        )
     else:
         loan_a_valid = False
+
 
     # --- Loan B ---
     min_down_b = max(home_price * 0.0351, home_price * 0.03)
@@ -192,6 +203,10 @@ if not loan_a_valid or not loan_b_valid:
 # -------------------------------
 loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
 loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
+
+if not loan_a_valid or not loan_b_valid:
+    st.warning("⚠️ No scenario found for one or both loans with the current inputs. Please adjust the down payment %, monthly budget, or total cash.")
+    st.stop()
 
 def count_pmi_months(df):
     return (df["PMI"] > 0).sum()
