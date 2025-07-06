@@ -1,47 +1,47 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import numpy_financial as npf
-import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Mortgage Comparison App", layout="wide")
-st.title("🏠 Mortgage Loan Comparison & Refinance Simulator")
+# -------------------------------
+# Streamlit Page Config
+# -------------------------------
+st.set_page_config(page_title="Mortgage Loan Comparison", layout="wide")
+st.title("🏡 Mortgage Loan Comparison + Refinance Planner")
 
-# --- Sidebar Inputs ---
-st.sidebar.header("Loan A")
-home_price_a = st.sidebar.number_input("Home Price", value=800000)
-down_a = st.sidebar.number_input("Down Payment %", value=20.0)
-rate_a = st.sidebar.number_input("Interest Rate (%)", value=6.5) / 100
-term_a = st.sidebar.number_input("Loan Term (years)", value=30)
-pmi_a = 0.0
+# -------------------------------
+# Sidebar Input Constraints
+# -------------------------------
+st.sidebar.header("🔍 Input Constraints")
 
-st.sidebar.header("Loan B")
-down_b = st.sidebar.number_input("Down Payment % (B)", value=3.51)
-rate_b = st.sidebar.number_input("Interest Rate (%) (B)", value=2.05) / 100
-term_b = st.sidebar.number_input("Loan Term (years) (B)", value=30)
-pmi_b = st.sidebar.number_input("Monthly PMI (B)", value=129.33)
+total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000)
+max_monthly = st.sidebar.number_input("Max Monthly Payment ($)", value=5000)
+max_down_pct = st.sidebar.slider("Max Down Payment (%)", 3.0, 100.0, 25.0)
+home_price = st.sidebar.number_input("Home Price ($)", value=800000)
+manual_override = st.sidebar.checkbox("🔧 Manually Enter Loan A and Loan B?")
 
-# Refinance
-st.sidebar.header("Refinance Scenario for Loan A")
-refi_year = st.sidebar.slider("Refinance Year", 1, 30, 5)
-refi_rate = st.sidebar.number_input("New Rate After Refi (%)", value=3.0) / 100
-refi_cost = st.sidebar.number_input("Refi Closing Costs ($)", value=10000)
-
-# --- Calculations ---
-def amortization_schedule(loan_amount, annual_rate, term_years, start_year=0, pmi=0, extra_costs=0):
+# -------------------------------
+# Loan Schedule with PMI logic
+# -------------------------------
+def amortization_schedule(loan_amount, annual_rate, term_years, home_price, start_year=0, pmi=0, extra_costs=0):
     monthly_rate = annual_rate / 12
     months = term_years * 12
     payment = npf.pmt(monthly_rate, months, -loan_amount)
-    
+
     schedule = []
     balance = loan_amount
     total_interest = 0
-    
+    max_ltv = 0.80
+
     for m in range(1, months + 1):
         interest = balance * monthly_rate
         principal = payment - interest
         balance -= principal
         total_interest += interest
-        total_payment = payment + pmi
+
+        current_ltv = balance / home_price
+        current_pmi = pmi if current_ltv > max_ltv else 0
+        total_payment = payment + current_pmi
 
         schedule.append({
             "Month": m,
@@ -52,60 +52,135 @@ def amortization_schedule(loan_amount, annual_rate, term_years, start_year=0, pm
             "Total Payment": round(total_payment, 2),
             "Balance": round(balance if balance > 0 else 0, 2),
             "Total Interest Paid": round(total_interest, 2),
-            "PMI": pmi,
+            "PMI": current_pmi,
             "Extra Costs": extra_costs if m == 1 else 0
         })
 
     return pd.DataFrame(schedule)
 
-# --- Loan A ---
-loan_amt_a = home_price_a * (1 - down_a / 100)
-loan_a = amortization_schedule(loan_amt_a, rate_a, term_a, pmi=pmi_a)
+# -------------------------------
+# Auto-Generate Loan A and B
+# -------------------------------
+term_years = 30
+months = term_years * 12
 
-# --- Refi Loan A ---
-def refinance_schedule(prev_df, new_rate, new_term_years, refi_year, closing_costs):
-    balance_at_refi = prev_df[prev_df["Year"] == refi_year]["Balance"].iloc[-1]
-    refi_df = amortization_schedule(balance_at_refi, new_rate, new_term_years, refi_year, extra_costs=closing_costs)
-    return pd.concat([prev_df[prev_df["Year"] < refi_year], refi_df])
+if not manual_override:
+    # --- Loan A ---
+    down_payment_a = min(home_price * max_down_pct / 100, total_cash)
+    loan_amount_a = home_price - down_payment_a
+    rate_a = 0.065
+    monthly_rate_a = rate_a / 12
+    monthly_payment_a = npf.pmt(monthly_rate_a, months, -loan_amount_a)
+    pmi_a = 0
+    discount_points_a = 0
+    extra_costs_a = 0
 
-loan_a_refi = refinance_schedule(loan_a, refi_rate, term_a - refi_year, refi_year, refi_cost)
+    # --- Loan B ---
+    min_down_b = max(home_price * 0.0351, home_price * 0.03)
+    loan_amount_b = home_price - min_down_b
+    available_for_points = total_cash - min_down_b
+    point_cost = loan_amount_b * 0.01
+    max_points = int(available_for_points // point_cost)
+    discount_rate_b = 0.065 - 0.0025 * max_points
+    monthly_rate_b = discount_rate_b / 12
+    monthly_payment_b = npf.pmt(monthly_rate_b, months, -loan_amount_b)
+    pmi_b = 129.33
+    discount_points_b = max_points
+    extra_costs_b = point_cost * max_points
+    down_payment_b = min_down_b
+else:
+    st.sidebar.header("Manual Loan A")
+    down_payment_a = st.sidebar.number_input("Down Payment A ($)", value=160000)
+    rate_a = st.sidebar.number_input("Interest Rate A (%)", value=6.5) / 100
+    pmi_a = 0
+    loan_amount_a = home_price - down_payment_a
+    monthly_payment_a = npf.pmt(rate_a / 12, months, -loan_amount_a)
+    discount_points_a = 0
+    extra_costs_a = 0
 
-# --- Loan B ---
-loan_amt_b = home_price_a * (1 - down_b / 100)
-loan_b = amortization_schedule(loan_amt_b, rate_b, term_b, pmi=pmi_b)
+    st.sidebar.header("Manual Loan B")
+    down_payment_b = st.sidebar.number_input("Down Payment B ($)", value=28080.0)
+    rate_b = st.sidebar.number_input("Interest Rate B (%)", value=2.05) / 100
+    loan_amount_b = home_price - down_payment_b
+    pmi_b = st.sidebar.number_input("PMI B ($)", value=129.33)
+    discount_points_b = st.sidebar.number_input("Discount Points B", value=17)
+    extra_costs_b = loan_amount_b * (discount_points_b * 0.01)
+    monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b)
+    discount_rate_b = rate_b
 
-# --- Summaries ---
-def summarize(df, label):
-    y = df.groupby("Year").agg({
-        "Principal": "sum",
-        "Interest": "sum",
-        "Total Payment": "sum",
-        "Balance": "last",
-        "PMI": "sum",
-        "Extra Costs": "sum"
-    }).reset_index()
-    y["Loan"] = label
-    return y
+# -------------------------------
+# Calculate Amortization
+# -------------------------------
+loan_a_df = amortization_schedule(
+    loan_amount=loan_amount_a,
+    annual_rate=rate_a,
+    term_years=term_years,
+    home_price=home_price,
+    pmi=pmi_a,
+    extra_costs=extra_costs_a
+)
 
-sum_a = summarize(loan_a, "Loan A")
-sum_a_refi = summarize(loan_a_refi, "Loan A Refi")
-sum_b = summarize(loan_b, "Loan B")
+loan_b_df = amortization_schedule(
+    loan_amount=loan_amount_b,
+    annual_rate=discount_rate_b,
+    term_years=term_years,
+    home_price=home_price,
+    pmi=pmi_b,
+    extra_costs=extra_costs_b
+)
 
-summary = pd.concat([sum_a, sum_a_refi, sum_b])
-pivot = summary.pivot(index="Year", columns="Loan", values="Balance")
+# -------------------------------
+# Generate Summary Data
+# -------------------------------
+def get_summary_points(df, years=[3, 5, 10, 15, 30]):
+    result = []
+    for yr in years:
+        slice_df = df[df["Year"] < yr]
+        total_payment = slice_df["Total Payment"].sum()
+        total_interest = slice_df["Interest"].sum()
+        remaining_balance = df[df["Year"] == yr]["Balance"].iloc[-1] if yr in df["Year"].values else 0
+        result.append({
+            "Year": f"{yr} Years",
+            "Total Payment": round(total_payment),
+            "Total Interest": round(total_interest),
+            "Remaining Balance": round(remaining_balance)
+        })
+    return pd.DataFrame(result)
 
-# --- Display ---
-st.subheader("📊 Remaining Balance by Year")
-st.line_chart(pivot)
+summary_a = get_summary_points(loan_a_df)
+summary_b = get_summary_points(loan_b_df)
 
-st.subheader("🧾 Yearly Summary")
-st.dataframe(summary)
+summary_final = summary_a.copy()
+summary_final["Loan A: Total Payment"] = summary_final.pop("Total Payment")
+summary_final["Loan A: Interest"] = summary_a["Total Interest"]
+summary_final["Loan A: Balance"] = summary_a["Remaining Balance"]
+summary_final["Loan B: Total Payment"] = summary_b["Total Payment"]
+summary_final["Loan B: Interest"] = summary_b["Total Interest"]
+summary_final["Loan B: Balance"] = summary_b["Remaining Balance"]
 
-# --- Total Cost Calculation ---
-def total_cost(df):
-    return df["Total Payment"].sum() + df["Extra Costs"].sum()
+# -------------------------------
+# Display Results
+# -------------------------------
+st.header("📋 Loan Comparison Summary")
 
-st.subheader("💰 Total Cost of Loan")
-st.write(f"**Loan A:** ${total_cost(loan_a):,.0f}")
-st.write(f"**Loan A Refi:** ${total_cost(loan_a_refi):,.0f}")
-st.write(f"**Loan B:** ${total_cost(loan_b):,.0f}")
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("Loan A")
+    st.markdown(f"- **Down Payment**: ${down_payment_a:,.0f}")
+    st.markdown(f"- **Loan Amount**: ${loan_amount_a:,.0f}")
+    st.markdown(f"- **Interest Rate**: {rate_a * 100:.2f}%")
+    st.markdown(f"- **Discount Points**: {discount_points_a}")
+    st.markdown(f"- **PMI**: ${pmi_a:,.2f}")
+    st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_a:,.2f}")
+
+with col2:
+    st.subheader("Loan B")
+    st.markdown(f"- **Down Payment**: ${down_payment_b:,.0f}")
+    st.markdown(f"- **Loan Amount**: ${loan_amount_b:,.0f}")
+    st.markdown(f"- **Interest Rate**: {discount_rate_b * 100:.2f}%")
+    st.markdown(f"- **Discount Points**: {discount_points_b}")
+    st.markdown(f"- **PMI**: ${pmi_b:,.2f}")
+    st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_b:,.2f}")
+
+st.subheader("📊 Loan Performance Over Time")
+st.dataframe(summary_final.set_index("Year"))
