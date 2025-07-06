@@ -214,4 +214,3 @@ with col2:
     st.subheader("Loan B")
     if valid_b:
         st.markdown(f"- **Down Payment**: ${down_payment_b:,.0f}")
-        st
