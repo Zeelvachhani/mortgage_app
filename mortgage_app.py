@@ -23,6 +23,20 @@ pmi_rate = st.sidebar.number_input("PMI Rate (%)", min_value=0.2, max_value=2.0,
 manual_override = st.sidebar.checkbox("🔧 Manually Enter Loan A and Loan B?")
 
 # -------------------------------
+# Validate Inputs - Show No Scenario if invalid
+# -------------------------------
+def valid_loan(loan_amount, monthly_payment, max_monthly, total_cash, down_payment, home_price, pmi_rate):
+    if loan_amount <= 0:
+        return False
+    pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
+    total_monthly = monthly_payment + pmi
+    if total_monthly > max_monthly or total_monthly <= 0:
+        return False
+    if down_payment > total_cash:
+        return False
+    return True
+
+# -------------------------------
 # Loan Schedule with PMI logic
 # -------------------------------
 def amortization_schedule(loan_amount, annual_rate, term_years, home_price, start_year=0, pmi_rate=0, extra_costs=0):
@@ -42,8 +56,7 @@ def amortization_schedule(loan_amount, annual_rate, term_years, home_price, star
         total_interest += interest
 
         current_ltv = balance / home_price
-        # PMI only applies if LTV > 80%
-        current_pmi = (loan_amount * pmi_rate  / 12) if current_ltv > max_ltv else 0
+        current_pmi = (loan_amount * pmi_rate / 12) if current_ltv > max_ltv else 0
         total_payment = payment + current_pmi
 
         schedule.append({
@@ -61,7 +74,6 @@ def amortization_schedule(loan_amount, annual_rate, term_years, home_price, star
 
     return pd.DataFrame(schedule)
 
-
 # -------------------------------
 # Auto-Generate Loan A and B or Manual Input
 # -------------------------------
@@ -71,7 +83,7 @@ months = term_years * 12
 def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate, base_rate, term_years, point_rate_reduction=0.0025, max_points_allowed=20):
     months = term_years * 12
     max_down_payment = min(home_price * max_down_pct / 100, total_cash)
-    min_down_payment = home_price * 0.03  # FHA-like floor
+    min_down_payment = home_price * 0.03
     step = 1000
 
     best_config = None
@@ -86,11 +98,10 @@ def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate
                 continue
 
             rate = base_rate - (point_rate_reduction * points)
-            rate = max(rate, 0.02)  # Minimum floor on rate
+            rate = max(rate, 0.02)
             monthly_rate = rate / 12
 
             payment = npf.pmt(monthly_rate, months, -loan_amount)
-
             pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
             total_monthly = payment + pmi
 
@@ -104,19 +115,17 @@ def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate
                     "points": points,
                     "extra_costs": point_cost
                 }
-                break  # Stop checking lower rates, we prefer fewer points
+                break
 
         if best_config:
-            break  # Found valid config at highest possible down payment
+            break
 
     return best_config
-
-
 
 if not manual_override:
     # --- Loan A ---
     base_rate_a = 0.065
-    
+
     loan_a_config = find_best_loan_a(
         home_price=home_price,
         max_down_pct=max_down_pct,
@@ -126,7 +135,7 @@ if not manual_override:
         base_rate=base_rate_a,
         term_years=term_years
     )
-    
+
     if loan_a_config is not None:
         down_payment_a = loan_a_config["down_payment"]
         loan_amount_a = loan_a_config["loan_amount"]
@@ -134,20 +143,8 @@ if not manual_override:
         monthly_payment_a = loan_a_config["monthly_payment"]
         discount_points_a = loan_a_config["points"]
         extra_costs_a = loan_a_config["extra_costs"]
-    
-        loan_a_valid = valid_loan(
-            loan_amount=loan_amount_a,
-            monthly_payment=monthly_payment_a,
-            max_monthly=max_monthly,
-            total_cash=total_cash,
-            down_payment=down_payment_a,
-            home_price=home_price,
-            pmi_rate=pmi_rate
-        )
     else:
         loan_a_valid = False
-
-
 
     # --- Loan B ---
     min_down_b = max(home_price * 0.0351, home_price * 0.03)
@@ -181,24 +178,10 @@ else:
     discount_rate_b = rate_b
 
 # -------------------------------
-# Validate Inputs - Show No Scenario if invalid
+# Validate Loan Configs
 # -------------------------------
-def valid_loan(loan_amount, monthly_payment, max_monthly, total_cash, down_payment, home_price, pmi_rate):
-    if loan_amount <= 0:
-        return False
-    # Estimate PMI based on LTV > 80%
-    pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
-    total_monthly = monthly_payment + pmi
-    if total_monthly > max_monthly or total_monthly <= 0:
-        return False
-    if down_payment > total_cash:
-        return False
-    return True
-
-
 loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a, home_price, pmi_rate)
 loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b, home_price, pmi_rate)
-
 
 if not loan_a_valid or not loan_b_valid:
     st.error("⚠️ No scenario found for one or both loans with the current inputs.")
@@ -207,27 +190,11 @@ if not loan_a_valid or not loan_b_valid:
 # -------------------------------
 # Calculate Amortization
 # -------------------------------
-loan_a_df = amortization_schedule(
-    loan_amount=loan_amount_a,
-    annual_rate=rate_a,
-    term_years=term_years,
-    home_price=home_price,
-    pmi_rate=pmi_rate,
-    extra_costs=extra_costs_a
-)
-
-loan_b_df = amortization_schedule(
-    loan_amount=loan_amount_b,
-    annual_rate=discount_rate_b,
-    term_years=term_years,
-    home_price=home_price,
-    pmi_rate=pmi_rate,
-    extra_costs=extra_costs_b
-)
+loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
+loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
 
 def count_pmi_months(df):
     return (df["PMI"] > 0).sum()
-
 
 # -------------------------------
 # Generate Summary Data
@@ -246,7 +213,6 @@ def get_summary_points(df, years=[1, 2, 3, 4, 5, 10, 15, 20, 25, 30]):
             "Remaining Balance": round(remaining_balance)
         })
     return pd.DataFrame(result)
-
 
 summary_a = get_summary_points(loan_a_df)
 summary_b = get_summary_points(loan_b_df)
@@ -267,12 +233,10 @@ def format_currency(df):
 
 summary_display = format_currency(summary_final.copy())
 
-
 # -------------------------------
 # Display Results
 # -------------------------------
 st.header("📋 Loan Comparison Summary")
-
 
 def display_loan_details(title, home_price, down_payment, rate, discount_points, closing_cost, pmi_rate, pmi_start, monthly_payment, df):
     st.subheader(title)
@@ -286,7 +250,7 @@ def display_loan_details(title, home_price, down_payment, rate, discount_points,
     st.markdown(f"- **Interest Rate**: {rate * 100:.2f}%")
     st.markdown(f"- **Discount Points**: {discount_points}")
     st.markdown(f"- **Closing Cost**: ${closing_cost:,.2f}")
-    st.markdown(f"- **PMI Rate**: {pmi_rate * 100:.3f}%")
+    st.markdown(f"- **PMI Rate**: {pmi_rate * 100:.2f}%")
     st.markdown(f"- **PMI (Monthly \\$ Estimate)**: ${pmi_start:,.2f}")
     st.markdown(f"- **Total Number of PMI Months**: {pmi_months}")
     st.markdown(f"- **P&I Monthly Payment**: ${monthly_payment:,.2f}")
@@ -296,36 +260,11 @@ col1, col2 = st.columns(2)
 
 with col1:
     pmi_a_start = (loan_amount_a * pmi_rate / 12) if (loan_amount_a / home_price) > 0.80 else 0
-    display_loan_details(
-        title="Loan A",
-        home_price=home_price,
-        down_payment=down_payment_a,
-        rate=rate_a,
-        discount_points=discount_points_a,
-        closing_cost=extra_costs_a,
-        pmi_rate=pmi_rate,
-        pmi_start=pmi_a_start,
-        monthly_payment=monthly_payment_a,
-        df=loan_a_df
-    )
+    display_loan_details("Loan A", home_price, down_payment_a, rate_a, discount_points_a, extra_costs_a, pmi_rate, pmi_a_start, monthly_payment_a, loan_a_df)
 
 with col2:
     pmi_b_start = (loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0
-    display_loan_details(
-        title="Loan B",
-        home_price=home_price,
-        down_payment=down_payment_b,
-        rate=discount_rate_b,
-        discount_points=discount_points_b,
-        closing_cost=extra_costs_b,
-        pmi_rate=pmi_rate,
-        pmi_start=pmi_b_start,
-        monthly_payment=monthly_payment_b,
-        df=loan_b_df
-    )
-
+    display_loan_details("Loan B", home_price, down_payment_b, discount_rate_b, discount_points_b, extra_costs_b, pmi_rate, pmi_b_start, monthly_payment_b, loan_b_df)
 
 st.subheader("📊 Loan Performance Over Time")
 st.dataframe(summary_final.set_index("Year"))
-
-
