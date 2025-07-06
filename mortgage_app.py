@@ -115,7 +115,7 @@ def valid_loan(loan_amount, monthly_payment, max_monthly, total_cash, down_payme
     if loan_amount <= 0:
         return False
     # Estimate PMI based on LTV > 80%
-    pmi = loan_amount * pmi_rate if (loan_amount / home_price) > 0.80 else 0
+    pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
     total_monthly = monthly_payment + pmi
     if total_monthly > max_monthly or total_monthly <= 0:
         return False
