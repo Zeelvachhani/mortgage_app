@@ -14,10 +14,11 @@ st.title("🏡 Mortgage Loan Comparison + Refinance Planner")
 # -------------------------------
 st.sidebar.header("🔍 Input Constraints")
 
-total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000)
-max_monthly = st.sidebar.number_input("Max Monthly Payment ($)", value=5000)
-max_down_pct = st.sidebar.number_input("Max Down Payment (%)", min_value=3.0, max_value=100.0, step=1.0)
 home_price = st.sidebar.number_input("Home Price ($)", value=800000)
+total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000)
+current_market_rate = st.sidebar.number_input("Current Market Interest Rate (%)", min_value=0.0, max_value=20.0, value=6.5, step=0.01) / 100
+max_down_pct = st.sidebar.number_input("Max Down Payment (%)", min_value=3.0, max_value=100.0, step=1.0)
+max_monthly = st.sidebar.number_input("Max Monthly Payment ($)", value=5000)
 pmi_rate = st.sidebar.number_input("PMI Rate (%)", min_value=0.2, max_value=2.0, value=0.2, step=0.01) / 100
 manual_override = st.sidebar.checkbox("🔧 Manually Enter Loan A and Loan B?")
 
@@ -82,7 +83,7 @@ if not manual_override:
     available_for_points = total_cash - min_down_b
     point_cost = loan_amount_b * 0.01
     max_points = int(available_for_points // point_cost) if point_cost > 0 else 0
-    discount_rate_b = 0.065 - 0.0025 * max_points if max_points > 0 else 0.065
+    discount_rate_b = max(current_market_rate - 0.0025 * max_points, 0.02)
     monthly_rate_b = discount_rate_b / 12
     monthly_payment_b = npf.pmt(monthly_rate_b, months, -loan_amount_b)
     discount_points_b = max_points
@@ -152,6 +153,10 @@ loan_b_df = amortization_schedule(
     extra_costs=extra_costs_b
 )
 
+def count_pmi_months(df):
+    return (df["PMI"] > 0).sum()
+
+
 # -------------------------------
 # Generate Summary Data
 # -------------------------------
@@ -186,30 +191,56 @@ summary_final["Loan B: Balance"] = summary_b["Remaining Balance"]
 # -------------------------------
 st.header("📋 Loan Comparison Summary")
 
+def display_loan_details(title, home_price, down_payment, rate, discount_points, closing_cost, pmi_rate, pmi_start, monthly_payment, df):
+    st.subheader(title)
+    dp_pct = down_payment / home_price * 100
+    pmi_months = count_pmi_months(df)
+    total_monthly = monthly_payment + pmi_start
+
+    st.markdown(f"- **Home Price**: ${home_price:,.0f}")
+    st.markdown(f"- **Down Payment**: ${down_payment:,.0f} ({dp_pct:.2f}%)")
+    st.markdown(f"- **Loan Amount**: ${home_price - down_payment:,.0f}")
+    st.markdown(f"- **Interest Rate**: {rate * 100:.2f}%")
+    st.markdown(f"- **Discount Points**: {discount_points}")
+    st.markdown(f"- **Closing Cost**: ${closing_cost:,.2f}")
+    st.markdown(f"- **PMI Rate**: {pmi_rate * 100:.3f}%")
+    st.markdown(f"- **PMI (Monthly $ Estimate)**: ${pmi_start:,.2f}")
+    st.markdown(f"- **Total Number of PMI Months**: {pmi_months}")
+    st.markdown(f"- **P&I Monthly Payment**: ${monthly_payment:,.2f}")
+    st.markdown(f"- **Total Monthly Payment**: ${total_monthly:,.2f}")
+
 col1, col2 = st.columns(2)
+
 with col1:
-    st.subheader("Loan A")
-    st.markdown(f"- **Down Payment**: ${down_payment_a:,.0f}$")
-    st.markdown(f"- **Loan Amount**: ${loan_amount_a:,.0f}$")
-    st.markdown(f"- **Interest Rate**: {rate_a * 100:.2f}%")
-    st.markdown(f"- **Discount Points**: {discount_points_a}")
-    st.markdown(f"- **PMI Rate**: {pmi_rate*100:.2f}%")
     pmi_a_start = (loan_amount_a * pmi_rate / 12) if (loan_amount_a / home_price) > 0.80 else 0
-    st.markdown(f"- **PMI /$**: ${(loan_amount_a * pmi_rate / 12) if (loan_amount_a / home_price) > 0.80 else 0:.2f}")
-    st.markdown(f"- **PMI (monthly /$ estimate)**: ${pmi_a_start:,.2f}")
-    st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_a:,.2f}")
+    display_loan_details(
+        title="Loan A",
+        home_price=home_price,
+        down_payment=down_payment_a,
+        rate=rate_a,
+        discount_points=discount_points_a,
+        closing_cost=extra_costs_a,
+        pmi_rate=pmi_rate,
+        pmi_start=pmi_a_start,
+        monthly_payment=monthly_payment_a,
+        df=loan_a_df
+    )
 
 with col2:
-    st.subheader("Loan B")
-    st.markdown(f"- **Down Payment**: ${down_payment_b:,.0f}")
-    st.markdown(f"- **Loan Amount**: ${loan_amount_b:,.0f}")
-    st.markdown(f"- **Interest Rate**: {discount_rate_b * 100:.2f}%")
-    st.markdown(f"- **Discount Points**: {discount_points_b}")
-    st.markdown(f"- **PMI Rate**: {pmi_rate*100:.3f}%")
     pmi_b_start = (loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0
-    st.markdown(f"- **PMI /$**: ${(loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0:.2f}")
-    st.markdown(f"- **PMI (monthly /$ estimate)**: ${pmi_b_start:,.2f}")
-    st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_b:,.2f}")
+    display_loan_details(
+        title="Loan B",
+        home_price=home_price,
+        down_payment=down_payment_b,
+        rate=discount_rate_b,
+        discount_points=discount_points_b,
+        closing_cost=extra_costs_b,
+        pmi_rate=pmi_rate,
+        pmi_start=pmi_b_start,
+        monthly_payment=monthly_payment_b,
+        df=loan_b_df
+    )
+
 
 st.subheader("📊 Loan Performance Over Time")
 st.dataframe(summary_final.set_index("Year"))
