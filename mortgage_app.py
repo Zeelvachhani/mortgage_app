@@ -42,7 +42,7 @@ def amortization_schedule(loan_amount, annual_rate, term_years, home_price, star
 
         current_ltv = balance / home_price
         # PMI only applies if LTV > 80%
-        current_pmi = loan_amount * pmi_rate if current_ltv > max_ltv else 0
+        current_pmi = (loan_amount * pmi_rate  / 12) if current_ltv > max_ltv else 0
         total_payment = payment + current_pmi
 
         schedule.append({
@@ -189,13 +189,13 @@ st.header("📋 Loan Comparison Summary")
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("Loan A")
-    st.markdown(f"- **Down Payment**: ${down_payment_a:,.0f}")
-    st.markdown(f"- **Loan Amount**: ${loan_amount_a:,.0f}")
+    st.markdown(f"- **Down Payment**: ${down_payment_a:,.0f}$")
+    st.markdown(f"- **Loan Amount**: ${loan_amount_a:,.0f}$")
     st.markdown(f"- **Interest Rate**: {rate_a * 100:.2f}%")
     st.markdown(f"- **Discount Points**: {discount_points_a}")
-    st.markdown(f"- **PMI Rate**: {pmi_rate*100:.3f}%")
+    st.markdown(f"- **PMI Rate**: {pmi_rate*100:.2f}%")
     # Calculate and show PMI for Loan A at start (if applicable)
-    pmi_a_start = loan_amount_a * pmi_rate if (loan_amount_a / home_price) > 0.80 else 0
+    st.markdown(f"- **PMI /$**: ${(loan_amount_a * pmi_rate / 12) if (loan_amount_a / home_price) > 0.80 else 0:.2f}")
     st.markdown(f"- **PMI (monthly /$ estimate)**: ${pmi_a_start:,.2f}")
     st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_a:,.2f}")
 
@@ -206,7 +206,8 @@ with col2:
     st.markdown(f"- **Interest Rate**: {discount_rate_b * 100:.2f}%")
     st.markdown(f"- **Discount Points**: {discount_points_b}")
     st.markdown(f"- **PMI Rate**: {pmi_rate*100:.3f}%")
-    pmi_b_start = loan_amount_b * pmi_rate if (loan_amount_b / home_price) > 0.80 else 0
+    #pmi_b_start = (loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0
+    st.markdown(f"- **PMI /$**: ${(loan_amount_a * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0:.2f}")
     st.markdown(f"- **PMI (monthly /$ estimate)**: ${pmi_b_start:,.2f}")
     st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_b:,.2f}")
 
