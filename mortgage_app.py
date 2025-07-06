@@ -68,57 +68,75 @@ def amortization_schedule(loan_amount, annual_rate, term_years, home_price, star
 term_years = 30
 months = term_years * 12
 
-def find_best_down_payment(home_price, max_down_pct, total_cash, max_monthly, pmi_rate, rate, term_years):
+def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate, base_rate, term_years, point_rate_reduction=0.0025, max_points_allowed=20):
     months = term_years * 12
     max_down_payment = min(home_price * max_down_pct / 100, total_cash)
-    
-    # We'll try down payments from max down payment down to 3% of home price, decrementing by $10 steps for speed
-    step = 10
-    min_down_payment = home_price * 0.03  # 3%
-    
-    best_down_payment = None
-    best_monthly_payment = None
-    
+    min_down_payment = home_price * 0.03  # FHA-like floor
+    step = 1000
+
+    best_config = None
+
     for dp in range(int(max_down_payment), int(min_down_payment) - 1, -step):
         loan_amount = home_price - dp
-        monthly_rate = rate / 12
-        payment = npf.pmt(monthly_rate, months, -loan_amount)
-        
-        # PMI monthly if LTV > 80%
-        pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
-        total_monthly = payment + pmi
-        
-        if total_monthly <= max_monthly:
-            best_down_payment = dp
-            best_monthly_payment = payment
-            break  # Found highest valid down payment
-    
-    # If no valid down payment found, fallback to min_down_payment anyway (even if invalid)
-    if best_down_payment is None:
-        best_down_payment = min_down_payment
-        best_monthly_payment = npf.pmt(rate / 12, months, -(home_price - best_down_payment))
-    
-    return best_down_payment, best_monthly_payment
+        available_cash_for_points = total_cash - dp
+
+        for points in range(0, max_points_allowed + 1):
+            point_cost = loan_amount * (points * 0.01)
+            if point_cost > available_cash_for_points:
+                continue
+
+            rate = base_rate - (point_rate_reduction * points)
+            rate = max(rate, 0.02)  # Minimum floor on rate
+            monthly_rate = rate / 12
+
+            payment = npf.pmt(monthly_rate, months, -loan_amount)
+
+            pmi = (loan_amount * pmi_rate) / 12 if (loan_amount / home_price) > 0.80 else 0
+            total_monthly = payment + pmi
+
+            if total_monthly <= max_monthly:
+                best_config = {
+                    "down_payment": dp,
+                    "loan_amount": loan_amount,
+                    "rate": rate,
+                    "monthly_payment": payment,
+                    "pmi": pmi,
+                    "points": points,
+                    "extra_costs": point_cost
+                }
+                break  # Stop checking lower rates, we prefer fewer points
+
+        if best_config:
+            break  # Found valid config at highest possible down payment
+
+    return best_config
+
 
 
 if not manual_override:
     # --- Loan A ---
-    # --- Loan A ---
-    rate_a = 0.065
+    base_rate_a = 0.065
     
-    down_payment_a, monthly_payment_a = find_best_down_payment(
+    loan_a_config = find_best_loan_a(
         home_price=home_price,
         max_down_pct=max_down_pct,
         total_cash=total_cash,
         max_monthly=max_monthly,
         pmi_rate=pmi_rate,
-        rate=rate_a,
+        base_rate=base_rate_a,
         term_years=term_years
     )
     
-    loan_amount_a = home_price - down_payment_a
-    discount_points_a = 0
-    extra_costs_a = 0
+    if loan_a_config is None:
+        loan_a_valid = False
+    else:
+        down_payment_a = loan_a_config["down_payment"]
+        loan_amount_a = loan_a_config["loan_amount"]
+        rate_a = loan_a_config["rate"]
+        monthly_payment_a = loan_a_config["monthly_payment"]
+        discount_points_a = loan_a_config["points"]
+        extra_costs_a = loan_a_config["extra_costs"]
+
 
 
     # --- Loan B ---
