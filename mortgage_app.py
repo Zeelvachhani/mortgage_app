@@ -194,7 +194,7 @@ with col1:
     st.markdown(f"- **Interest Rate**: {rate_a * 100:.2f}%")
     st.markdown(f"- **Discount Points**: {discount_points_a}")
     st.markdown(f"- **PMI Rate**: {pmi_rate*100:.2f}%")
-    # Calculate and show PMI for Loan A at start (if applicable)
+    pmi_a_start = (loan_amount_a * pmi_rate / 12) if (loan_amount_a / home_price) > 0.80 else 0
     st.markdown(f"- **PMI /$**: ${(loan_amount_a * pmi_rate / 12) if (loan_amount_a / home_price) > 0.80 else 0:.2f}")
     st.markdown(f"- **PMI (monthly /$ estimate)**: ${pmi_a_start:,.2f}")
     st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_a:,.2f}")
@@ -206,8 +206,8 @@ with col2:
     st.markdown(f"- **Interest Rate**: {discount_rate_b * 100:.2f}%")
     st.markdown(f"- **Discount Points**: {discount_points_b}")
     st.markdown(f"- **PMI Rate**: {pmi_rate*100:.3f}%")
-    #pmi_b_start = (loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0
-    st.markdown(f"- **PMI /$**: ${(loan_amount_a * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0:.2f}")
+    pmi_b_start = (loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0
+    st.markdown(f"- **PMI /$**: ${(loan_amount_b * pmi_rate / 12) if (loan_amount_b / home_price) > 0.80 else 0:.2f}")
     st.markdown(f"- **PMI (monthly /$ estimate)**: ${pmi_b_start:,.2f}")
     st.markdown(f"- **Monthly Payment (P&I)**: ${monthly_payment_b:,.2f}")
 
