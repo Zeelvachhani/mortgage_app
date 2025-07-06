@@ -127,9 +127,7 @@ if not manual_override:
         term_years=term_years
     )
     
-    if loan_a_config is None:
-        loan_a_valid = False
-    else:
+    if loan_a_config is not None:
         down_payment_a = loan_a_config["down_payment"]
         loan_amount_a = loan_a_config["loan_amount"]
         rate_a = loan_a_config["rate"]
@@ -137,7 +135,6 @@ if not manual_override:
         discount_points_a = loan_a_config["points"]
         extra_costs_a = loan_a_config["extra_costs"]
     
-        # ✅ Validate now that variables are safely defined
         loan_a_valid = valid_loan(
             loan_amount=loan_amount_a,
             monthly_payment=monthly_payment_a,
@@ -147,7 +144,8 @@ if not manual_override:
             home_price=home_price,
             pmi_rate=pmi_rate
         )
-
+    else:
+        loan_a_valid = False
 
 
 
