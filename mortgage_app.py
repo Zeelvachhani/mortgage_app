@@ -136,6 +136,18 @@ if not manual_override:
         monthly_payment_a = loan_a_config["monthly_payment"]
         discount_points_a = loan_a_config["points"]
         extra_costs_a = loan_a_config["extra_costs"]
+    
+        # ✅ Validate now that variables are safely defined
+        loan_a_valid = valid_loan(
+            loan_amount=loan_amount_a,
+            monthly_payment=monthly_payment_a,
+            max_monthly=max_monthly,
+            total_cash=total_cash,
+            down_payment=down_payment_a,
+            home_price=home_price,
+            pmi_rate=pmi_rate
+        )
+
 
 
 
