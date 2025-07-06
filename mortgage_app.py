@@ -204,7 +204,7 @@ def display_loan_details(title, home_price, down_payment, rate, discount_points,
     st.markdown(f"- **Discount Points**: {discount_points}")
     st.markdown(f"- **Closing Cost**: ${closing_cost:,.2f}")
     st.markdown(f"- **PMI Rate**: {pmi_rate * 100:.3f}%")
-    st.markdown(f"- **PMI (Monthly $ Estimate)**: ${pmi_start:,.2f}")
+    st.markdown(f"- **PMI (Monthly \\$ Estimate)**: ${pmi_start:,.2f}")
     st.markdown(f"- **Total Number of PMI Months**: {pmi_months}")
     st.markdown(f"- **P&I Monthly Payment**: ${monthly_payment:,.2f}")
     st.markdown(f"- **Total Monthly Payment**: ${total_monthly:,.2f}")
