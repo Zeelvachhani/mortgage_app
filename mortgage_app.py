@@ -18,7 +18,7 @@ total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000)
 max_monthly = st.sidebar.number_input("Max Monthly Payment ($)", value=5000)
 max_down_pct = st.sidebar.number_input("Max Down Payment (%)", min_value=3.0, max_value=100.0, step=1.0)
 home_price = st.sidebar.number_input("Home Price ($)", value=800000)
-pmi_rate = st.sidebar.number_input("PMI Rate (%)", min_value=0.2, max_value=2.0, value=0.5, step=0.01) / 100
+pmi_rate = st.sidebar.number_input("PMI Rate (%)", min_value=0.2, max_value=2.0, value=0.2, step=0.01) / 100
 manual_override = st.sidebar.checkbox("🔧 Manually Enter Loan A and Loan B?")
 
 # -------------------------------
