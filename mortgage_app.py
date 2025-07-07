@@ -181,6 +181,17 @@ else:
     discount_points_a = 0
     extra_costs_a = 0
 
+    # Validate Loan A
+    loan_a_valid = valid_loan(
+        loan_amount=loan_amount_a,
+        monthly_payment=monthly_payment_a,
+        max_monthly=max_monthly,
+        total_cash=total_cash,
+        down_payment=down_payment_a,
+        home_price=home_price,
+        pmi_rate=pmi_rate
+    )
+
     st.sidebar.header("Manual Loan B")
     down_payment_b = st.sidebar.number_input("Down Payment B ($)", value=28080.0)
     rate_b = st.sidebar.number_input("Interest Rate B (%)", value=2.05) / 100
@@ -190,11 +201,23 @@ else:
     monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b)
     discount_rate_b = rate_b
 
+    # Validate Loan B
+    loan_b_valid = valid_loan(
+        loan_amount=loan_amount_b,
+        monthly_payment=monthly_payment_b,
+        max_monthly=max_monthly,
+        total_cash=total_cash,
+        down_payment=down_payment_b,
+        home_price=home_price,
+        pmi_rate=pmi_rate
+    )
+
+
 # -------------------------------
 # Validate Loan Configs
 # -------------------------------
 # loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a, home_price, pmi_rate)
-loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b, home_price, pmi_rate)
+# loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b, home_price, pmi_rate)
 
 if not loan_a_valid or not loan_b_valid:
     st.error("⚠️ No scenario found for one or both loans with the current inputs.")
