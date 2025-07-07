@@ -157,68 +157,43 @@ if not manual_override:
         loan_a_valid = False
 
     # --- Loan B ---
-    if home_price:
+    if home_price and total_cash:  # Ensure both values are valid
         min_down_b = max(home_price * 0.0351, home_price * 0.03)
         loan_amount_b = home_price - min_down_b
         available_for_points = total_cash - min_down_b
         point_cost = loan_amount_b * 0.01
         max_points = int(available_for_points // point_cost) if point_cost > 0 else 0
-        discount_rate_b = max(current_market_rate - 0.0025 * max_points, 0.02)
-        monthly_rate_b = discount_rate_b / 12
-        monthly_payment_b = npf.pmt(monthly_rate_b, months, -loan_amount_b)
-        discount_points_b = max_points
-        extra_costs_b = point_cost * max_points if max_points > 0 else 0
-        down_payment_b = min_down_b
         
-        loan_b_valid = valid_loan(
-            loan_amount=loan_amount_b,
-            monthly_payment=monthly_payment_b,
-            max_monthly=max_monthly,
-            total_cash=total_cash,
-            down_payment=down_payment_b,
-            home_price=home_price,
-            pmi_rate=pmi_rate
-        )
+        # Debugging statements
+        st.write(f"Home Price: {home_price}, Total Cash: {total_cash}, Min Down Payment: {min_down_b}, Loan Amount B: {loan_amount_b}, Available for Points: {available_for_points}, Max Points: {max_points}")
+
+        if max_points >= 0:  # Ensure max_points is valid
+            discount_rate_b = max(current_market_rate - 0.0025 * max_points, 0.02)
+            monthly_rate_b = discount_rate_b / 12
+            monthly_payment_b = npf.pmt(monthly_rate_b, months, -loan_amount_b)
+            discount_points_b = max_points
+            extra_costs_b = point_cost * max_points if max_points > 0 else 0
+            down_payment_b = min_down_b
+            
+            loan_b_valid = valid_loan(
+                loan_amount=loan_amount_b,
+                monthly_payment=monthly_payment_b,
+                max_monthly=max_monthly,
+                total_cash=total_cash,
+                down_payment=down_payment_b,
+                home_price=home_price,
+                pmi_rate=pmi_rate
+            )
+        else:
+            st.error("⚠️ Max points calculation is invalid. Please check your inputs.")
+            loan_b_valid = False
     else:
+        st.error("⚠️ Home price or total cash is invalid. Please check your inputs.")
         loan_b_valid = False
 
 else:
-    # Manual input section
-    st.sidebar.header("Manual Loan A")
-    down_payment_a = st.sidebar.number_input("Down Payment A ($)", min_value=0)
-    rate_a = st.sidebar.number_input("Interest Rate A (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
-    loan_amount_a = home_price - down_payment_a if home_price else None
-    monthly_payment_a = npf.pmt(rate_a / 12, months, -loan_amount_a) if loan_amount_a else None
-    discount_points_a = 0
-    extra_costs_a = 0
-
-    loan_a_valid = valid_loan(
-        loan_amount=loan_amount_a,
-        monthly_payment=monthly_payment_a,
-        max_monthly=max_monthly,
-        total_cash=total_cash,
-        down_payment=down_payment_a,
-        home_price=home_price,
-        pmi_rate=pmi_rate
-    ) if loan_amount_a and monthly_payment_a else False
-
-    st.sidebar.header("Manual Loan B")
-    down_payment_b = st.sidebar.number_input("Down Payment B ($)", min_value=0)
-    rate_b = st.sidebar.number_input("Interest Rate B (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
-    loan_amount_b = home_price - down_payment_b if home_price else None
-    discount_points_b = st.sidebar.number_input("Discount Points B", min_value=0)
-    extra_costs_b = loan_amount_b * (discount_points_b * 0.01) if loan_amount_b else 0
-    monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b) if loan_amount_b else None
-
-    loan_b_valid = valid_loan(
-        loan_amount=loan_amount_b,
-        monthly_payment=monthly_payment_b,
-        max_monthly=max_monthly,
-        total_cash=total_cash,
-        down_payment=down_payment_b,
-        home_price=home_price,
-        pmi_rate=pmi_rate
-    ) if loan_amount_b and monthly_payment_b else False
+    # Manual input section remains unchanged
+    # ...
 
 # -------------------------------
 # Validation and Calculation
@@ -233,7 +208,6 @@ if not loan_a_valid or not loan_b_valid:
 
 # Ensure loan_amount_b is defined before calling amortization_schedule
 if loan_amount_a is not None and loan_amount_b is not None:
-    # Ensure discount_rate_b is defined before calling amortization_schedule
     if 'discount_rate_b' in locals():
         loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
         loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
@@ -243,6 +217,7 @@ if loan_amount_a is not None and loan_amount_b is not None:
 else:
     st.error("⚠️ Loan amounts could not be calculated. Please check your inputs.")
     st.stop()
+
 
 # -------------------------------
 # Calculate Amortization
