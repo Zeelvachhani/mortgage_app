@@ -15,7 +15,7 @@ st.title("🏡 Mortgage Loan Comparison")
 st.sidebar.header("🔍 Input Constraints")
 
 home_price = st.sidebar.number_input("Home Price ($)", value=800000, step=10000.0)
-total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000, step=10000)
+total_cash = st.sidebar.number_input("Total Cash Available ($)", value=120000, step=10000.0)
 current_market_rate = st.sidebar.number_input("Current Market Interest Rate (%)", min_value=0.0, max_value=20.0, value=6.5, step=0.01) / 100
 max_down_pct = st.sidebar.number_input("Max Down Payment (%)", min_value=3.0, max_value=100.0, step=1.0)
 max_monthly = st.sidebar.number_input("Max Monthly Payment ($)", value=5000)
