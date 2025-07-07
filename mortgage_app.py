@@ -121,7 +121,7 @@ def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate
             break
 
     return best_config
-
+    
 if not manual_override:
     # --- Loan A ---
     base_rate_a = current_market_rate if current_market_rate else 0.065
@@ -192,8 +192,6 @@ if not manual_override:
         loan_b_valid = False
 
 else:
-    # Manual input section remains unchanged
-    # ...
 
 # -------------------------------
 # Validation and Calculation
