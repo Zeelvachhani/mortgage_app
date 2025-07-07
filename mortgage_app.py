@@ -7,7 +7,7 @@ import numpy_financial as npf
 # Streamlit Page Config
 # -------------------------------
 st.set_page_config(page_title="Mortgage Loan Comparison", layout="wide")
-st.title("🏡 Mortgage Loan Comparison + Refinance Planner")
+st.title("🏡 Mortgage Loan Comparison")
 
 # -------------------------------
 # Sidebar Input Constraints
