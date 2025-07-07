@@ -233,8 +233,13 @@ if not loan_a_valid or not loan_b_valid:
 
 # Ensure loan_amount_b is defined before calling amortization_schedule
 if loan_amount_a is not None and loan_amount_b is not None:
-    loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
-    loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
+    # Ensure discount_rate_b is defined before calling amortization_schedule
+    if 'discount_rate_b' in locals():
+        loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
+        loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
+    else:
+        st.error("⚠️ Discount rate for Loan B could not be calculated. Please check your inputs.")
+        st.stop()
 else:
     st.error("⚠️ Loan amounts could not be calculated. Please check your inputs.")
     st.stop()
