@@ -124,7 +124,7 @@ def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate
 
 if not manual_override:
     # --- Loan A ---
-    base_rate_a = 0.065
+    base_rate_a = current_market_rate if current_market_rate else 0.065
     
     loan_a_config = find_best_loan_a(
         home_price=home_price,
@@ -134,8 +134,7 @@ if not manual_override:
         pmi_rate=pmi_rate,
         base_rate=base_rate_a,
         term_years=term_years
-    
-    )
+        )
 
     if loan_a_config is not None:
         down_payment_a = loan_a_config["down_payment"]
@@ -157,31 +156,42 @@ if not manual_override:
     else:
         loan_a_valid = False
 
-
-
     # --- Loan B ---
-    min_down_b = max(home_price * 0.0351, home_price * 0.03)
-    loan_amount_b = home_price - min_down_b
-    available_for_points = total_cash - min_down_b
-    point_cost = loan_amount_b * 0.01
-    max_points = int(available_for_points // point_cost) if point_cost > 0 else 0
-    discount_rate_b = max(current_market_rate - 0.0025 * max_points, 0.02)
-    monthly_rate_b = discount_rate_b / 12
-    monthly_payment_b = npf.pmt(monthly_rate_b, months, -loan_amount_b)
-    discount_points_b = max_points
-    extra_costs_b = point_cost * max_points if max_points > 0 else 0
-    down_payment_b = min_down_b
+    if home_price:
+        min_down_b = max(home_price * 0.0351, home_price * 0.03)
+        loan_amount_b = home_price - min_down_b
+        available_for_points = total_cash - min_down_b
+        point_cost = loan_amount_b * 0.01
+        max_points = int(available_for_points // point_cost) if point_cost > 0 else 0
+        discount_rate_b = max(current_market_rate - 0.0025 * max_points, 0.02)
+        monthly_rate_b = discount_rate_b / 12
+        monthly_payment_b = npf.pmt(monthly_rate_b, months, -loan_amount_b)
+        discount_points_b = max_points
+        extra_costs_b = point_cost * max_points if max_points > 0 else 0
+        down_payment_b = min_down_b
+        
+        loan_b_valid = valid_loan(
+            loan_amount=loan_amount_b,
+            monthly_payment=monthly_payment_b,
+            max_monthly=max_monthly,
+            total_cash=total_cash,
+            down_payment=down_payment_b,
+            home_price=home_price,
+            pmi_rate=pmi_rate
+        )
+    else:
+        loan_b_valid = False
 
 else:
+    # Manual input section remains unchanged
     st.sidebar.header("Manual Loan A")
-    down_payment_a = st.sidebar.number_input("Down Payment A ($)", value=160000)
-    rate_a = st.sidebar.number_input("Interest Rate A (%)", value=6.5) / 100
-    loan_amount_a = home_price - down_payment_a
-    monthly_payment_a = npf.pmt(rate_a / 12, months, -loan_amount_a)
+    down_payment_a = st.sidebar.number_input("Down Payment A ($)", min_value=0)
+    rate_a = st.sidebar.number_input("Interest Rate A (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
+    loan_amount_a = home_price - down_payment_a if home_price else None
+    monthly_payment_a = npf.pmt(rate_a / 12, months, -loan_amount_a) if loan_amount_a else None
     discount_points_a = 0
     extra_costs_a = 0
 
-    # Validate Loan A
     loan_a_valid = valid_loan(
         loan_amount=loan_amount_a,
         monthly_payment=monthly_payment_a,
@@ -190,18 +200,16 @@ else:
         down_payment=down_payment_a,
         home_price=home_price,
         pmi_rate=pmi_rate
-    )
+    ) if loan_amount_a and monthly_payment_a else False
 
     st.sidebar.header("Manual Loan B")
-    down_payment_b = st.sidebar.number_input("Down Payment B ($)", value=28080.0)
-    rate_b = st.sidebar.number_input("Interest Rate B (%)", value=2.05) / 100
-    loan_amount_b = home_price - down_payment_b
-    discount_points_b = st.sidebar.number_input("Discount Points B", value=17)
-    extra_costs_b = loan_amount_b * (discount_points_b * 0.01)
-    monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b)
-    discount_rate_b = rate_b
+    down_payment_b = st.sidebar.number_input("Down Payment B ($)", min_value=0)
+    rate_b = st.sidebar.number_input("Interest Rate B (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
+    loan_amount_b = home_price - down_payment_b if home_price else None
+    discount_points_b = st.sidebar.number_input("Discount Points B", min_value=0)
+    extra_costs_b = loan_amount_b * (discount_points_b * 0.01) if loan_amount_b else 0
+    monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b) if loan_amount_b else None
 
-    # Validate Loan B
     loan_b_valid = valid_loan(
         loan_amount=loan_amount_b,
         monthly_payment=monthly_payment_b,
@@ -210,18 +218,19 @@ else:
         down_payment=down_payment_b,
         home_price=home_price,
         pmi_rate=pmi_rate
-    )
-
+    ) if loan_amount_b and monthly_payment_b else False
 
 # -------------------------------
-# Validate Loan Configs
+# Validation and Calculation
 # -------------------------------
-# loan_a_valid = valid_loan(loan_amount_a, monthly_payment_a, max_monthly, total_cash, down_payment_a, home_price, pmi_rate)
-# loan_b_valid = valid_loan(loan_amount_b, monthly_payment_b, max_monthly, total_cash, down_payment_b, home_price, pmi_rate)
+if not home_price or not total_cash or not current_market_rate or not max_down_pct or not max_monthly or not pmi_rate:
+    st.warning("⚠️ Please fill in all input fields to proceed.")
+    st.stop()
 
 if not loan_a_valid or not loan_b_valid:
-    st.error("⚠️ No scenario found for one or both loans with the current inputs.")
+    st.error("⚠️ No scenario found for one or both loans with the current inputs. Please adjust your loan parameters.")
     st.stop()
+
 
 # -------------------------------
 # Calculate Amortization
