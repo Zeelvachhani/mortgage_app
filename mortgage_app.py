@@ -134,7 +134,7 @@ if not manual_override:
         pmi_rate=pmi_rate,
         base_rate=base_rate_a,
         term_years=term_years
-        )
+    )
 
     if loan_a_config is not None:
         down_payment_a = loan_a_config["down_payment"]
@@ -183,7 +183,7 @@ if not manual_override:
         loan_b_valid = False
 
 else:
-    # Manual input section remains unchanged
+    # Manual input section
     st.sidebar.header("Manual Loan A")
     down_payment_a = st.sidebar.number_input("Down Payment A ($)", min_value=0)
     rate_a = st.sidebar.number_input("Interest Rate A (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
@@ -231,6 +231,13 @@ if not loan_a_valid or not loan_b_valid:
     st.error("⚠️ No scenario found for one or both loans with the current inputs. Please adjust your loan parameters.")
     st.stop()
 
+# Ensure loan_amount_b is defined before calling amortization_schedule
+if loan_amount_a is not None and loan_amount_b is not None:
+    loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
+    loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
+else:
+    st.error("⚠️ Loan amounts could not be calculated. Please check your inputs.")
+    st.stop()
 
 # -------------------------------
 # Calculate Amortization
