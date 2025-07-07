@@ -236,7 +236,7 @@ summary_b = get_summary_points(loan_b_df)
 
 summary_final = summary_a.copy()
 summary_final.drop(columns=["Total Payment", "Total Interest"], inplace=True)
-summary_final["Loan A: Total Payment"] = summary_a.["Total Payment"]
+summary_final["Loan A: Total Payment"] = summary_a["Total Payment"]
 summary_final["Loan A: Interest"] = summary_a["Total Interest"]
 summary_final["Loan A: Balance"] = summary_a["Remaining Balance"]
 summary_final["Loan B: Total Payment"] = summary_b["Total Payment"]
