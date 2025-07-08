@@ -125,6 +125,24 @@ def find_best_loan_a(home_price, max_down_pct, total_cash, max_monthly, pmi_rate
 
     return best_config
 
+# Initialize loan parameters outside the if/else for manual_override to ensure they always exist
+down_payment_a = 0
+loan_amount_a = 0
+rate_a = 0.0
+monthly_payment_a = 0
+discount_points_a = 0
+extra_costs_a = 0
+loan_a_valid = False
+
+down_payment_b = 0
+loan_amount_b = 0
+discount_rate_b = 0.0 # Renamed from rate_b for consistency with auto-generated
+monthly_payment_b = 0
+discount_points_b = 0
+extra_costs_b = 0
+loan_b_valid = False
+
+
 if not manual_override:
     # --- Loan A ---
     base_rate_a = current_market_rate if current_market_rate else 0.065
@@ -182,19 +200,19 @@ if not manual_override:
             home_price=home_price,
             pmi_rate=pmi_rate
         )
-    except:
-        st.error("Error calculating Loan B parameters")
+    except Exception as e: # Catch any error in Loan B calculation
+        st.error(f"Error calculating Loan B parameters: {str(e)}")
         loan_b_valid = False
-        discount_rate_b = None
-        loan_amount_b = None
+        discount_rate_b = 0.0 # Ensure it's initialized
+        loan_amount_b = 0 # Ensure it's initialized
 
 else:
     # Manual input section
     st.sidebar.header("Manual Loan A")
     down_payment_a = st.sidebar.number_input("Down Payment A ($)", min_value=0)
     rate_a = st.sidebar.number_input("Interest Rate A (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
-    loan_amount_a = home_price - down_payment_a if home_price else None
-    monthly_payment_a = npf.pmt(rate_a / 12, months, -loan_amount_a) if loan_amount_a else None
+    loan_amount_a = home_price - down_payment_a if home_price else 0 # Ensure 0 if home_price is None/0
+    monthly_payment_a = npf.pmt(rate_a / 12, months, -loan_amount_a) if loan_amount_a else 0 # Ensure 0 if loan_amount_a is None/0
     discount_points_a = 0
     extra_costs_a = 0
 
@@ -206,15 +224,15 @@ else:
         down_payment=down_payment_a,
         home_price=home_price,
         pmi_rate=pmi_rate
-    ) if loan_amount_a and monthly_payment_a else False
+    ) if loan_amount_a and monthly_payment_a else False # Only validate if values exist
 
     st.sidebar.header("Manual Loan B")
     down_payment_b = st.sidebar.number_input("Down Payment B ($)", min_value=0)
     rate_b = st.sidebar.number_input("Interest Rate B (%)", min_value=0.0, max_value=20.0, step=0.01) / 100
-    loan_amount_b = home_price - down_payment_b if home_price else None
+    loan_amount_b = home_price - down_payment_b if home_price else 0
     discount_points_b = st.sidebar.number_input("Discount Points B", min_value=0)
     extra_costs_b = loan_amount_b * (discount_points_b * 0.01) if loan_amount_b else 0
-    monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b) if loan_amount_b else None
+    monthly_payment_b = npf.pmt(rate_b / 12, months, -loan_amount_b) if loan_amount_b else 0
 
     loan_b_valid = valid_loan(
         loan_amount=loan_amount_b,
@@ -225,107 +243,119 @@ else:
         home_price=home_price,
         pmi_rate=pmi_rate
     ) if loan_amount_b and monthly_payment_b else False
-    discount_rate_b = rate_b  # Set for manual input case
+    discount_rate_b = rate_b # Set for manual input case
 
 # -------------------------------
-# Validation and Calculation
+# Validation and Conditional Display
 # -------------------------------
+can_display_results = True # Initialize flag
+
+# Validation 1: Initial Inputs
 if not home_price or not total_cash or not current_market_rate or not max_down_pct or not max_monthly or not pmi_rate:
     st.warning("⚠️ Please fill in all input fields to proceed.")
-    st.stop()
+    can_display_results = False
 
-if not loan_a_valid or not loan_b_valid:
-    st.error("⚠️ No scenario found for one or both loans with the current inputs. Please adjust your loan parameters.")
-    st.stop()
+# Validation 2: Loan A & B validity (after their calculations are complete)
+if can_display_results: # Only check if previous validations passed
+    if not loan_a_valid or not loan_b_valid:
+        st.error("⚠️ No scenario found for one or both loans with the current inputs. Please adjust your loan parameters.")
+        can_display_results = False
 
-try:
-    loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
-    loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
-except Exception as e:
-    st.error(f"Error generating amortization schedules: {str(e)}")
-    st.stop()
+# Validation 3: Critical values for display (after loan amounts are determined)
+if can_display_results: # Only check if previous validations passed
+    if not home_price or not loan_amount_a or not loan_amount_b:
+        st.error("⚠️ Critical values missing. Please restart the app.")
+        can_display_results = False
 
-def count_pmi_months(df):
-    return (df["PMI"] > 0).sum()
+# Only proceed with calculations and display if all validations pass
+if can_display_results:
+    try:
+        loan_a_df = amortization_schedule(loan_amount=loan_amount_a, annual_rate=rate_a, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_a)
+        loan_b_df = amortization_schedule(loan_amount=loan_amount_b, annual_rate=discount_rate_b, term_years=term_years, home_price=home_price, pmi_rate=pmi_rate, extra_costs=extra_costs_b)
+    except Exception as e:
+        st.error(f"Error generating amortization schedules: {str(e)}")
+        can_display_results = False # Set flag to False if error during schedule generation
 
-# Generate Summary Data
-def get_summary_points(df, years=[1, 2, 3, 4, 5, 10, 15, 20, 25, 30]):
-    result = []
-    for yr in years:
-        slice_df = df[df["Year"] < yr]
-        total_payment = slice_df["Total Payment"].sum()
-        total_interest = slice_df["Interest"].sum()
-        remaining_balance = df[df["Year"] == yr]["Balance"].iloc[-1] if yr in df["Year"].values else 0
-        result.append({
-            "Year": f"{yr} Years",
-            "Total Payment": round(total_payment),
-            "Total Interest": round(total_interest),
-            "Remaining Balance": round(remaining_balance)
-        })
-    return pd.DataFrame(result)
+# If after all checks, we can display results:
+if can_display_results:
+    def count_pmi_months(df):
+        return (df["PMI"] > 0).sum()
 
-summary_a = get_summary_points(loan_a_df)
-summary_b = get_summary_points(loan_b_df)
+    # Generate Summary Data
+    def get_summary_points(df, years=[1, 2, 3, 4, 5, 10, 15, 20, 25, 30]):
+        result = []
+        for yr in years:
+            slice_df = df[df["Year"] < yr]
+            total_payment = slice_df["Total Payment"].sum()
+            total_interest = slice_df["Interest"].sum()
+            # Handle cases where the year might not be exactly found
+            remaining_balance = df[df["Year"] == yr].iloc[-1]["Balance"] if not df[df["Year"] == yr].empty else (df.iloc[-1]["Balance"] if not df.empty else 0)
+            result.append({
+                "Year": f"{yr} Years",
+                "Total Payment": round(total_payment),
+                "Total Interest": round(total_interest),
+                "Remaining Balance": round(remaining_balance)
+            })
+        return pd.DataFrame(result)
 
-summary_final = summary_a.copy()
-summary_final.drop(columns=["Total Payment", "Total Interest", "Remaining Balance"], inplace=True)
-summary_final["Loan A: Total Payment"] = summary_a["Total Payment"]
-summary_final["Loan A: Interest"] = summary_a["Total Interest"]
-summary_final["Loan A: Balance"] = summary_a["Remaining Balance"]
-summary_final["Loan B: Total Payment"] = summary_b["Total Payment"]
-summary_final["Loan B: Interest"] = summary_b["Total Interest"]
-summary_final["Loan B: Balance"] = summary_b["Remaining Balance"]
+    summary_a = get_summary_points(loan_a_df)
+    summary_b = get_summary_points(loan_b_df)
 
-def format_currency(df):
-    currency_cols = [col for col in df.columns if "Payment" in col or "Interest" in col or "Balance" in col]
-    for col in currency_cols:
-        df[col] = df[col].apply(lambda x: f"${x:,.0f}")
-    return df
+    summary_final = summary_a.copy()
+    summary_final.drop(columns=["Total Payment", "Total Interest", "Remaining Balance"], inplace=True)
+    summary_final["Loan A: Total Payment"] = summary_a["Total Payment"]
+    summary_final["Loan A: Interest"] = summary_a["Total Interest"]
+    summary_final["Loan A: Balance"] = summary_a["Remaining Balance"]
+    summary_final["Loan B: Total Payment"] = summary_b["Total Payment"]
+    summary_final["Loan B: Interest"] = summary_b["Total Interest"]
+    summary_final["Loan B: Balance"] = summary_b["Remaining Balance"]
 
-summary_display = format_currency(summary_final.copy())
+    def format_currency(df):
+        currency_cols = [col for col in df.columns if "Payment" in col or "Interest" in col or "Balance" in col]
+        for col in currency_cols:
+            df[col] = df[col].apply(lambda x: f"${x:,.0f}")
+        return df
 
-# Display Results
-st.header("📋 Loan Comparison Summary")
+    summary_display = format_currency(summary_final.copy())
 
-if not home_price or not loan_amount_a or not loan_amount_b:
-    st.error("⚠️ Critical values missing. Please restart the app.")
-    st.stop()
+    # Display Results
+    st.header("📋 Loan Comparison Summary")
 
-def display_loan_details(title, home_price, down_payment, rate, discount_points, closing_cost, pmi_rate, pmi_start, monthly_payment, df):
-    st.subheader(title)
-    dp_pct = down_payment / home_price * 100 if home_price else 0
-    pmi_months = count_pmi_months(df)
-    total_monthly = monthly_payment + pmi_start if pmi_start else monthly_payment
+    def display_loan_details(title, home_price, down_payment, rate, discount_points, closing_cost, pmi_rate, pmi_start, monthly_payment, df):
+        st.subheader(title)
+        dp_pct = down_payment / home_price * 100 if home_price else 0
+        pmi_months = count_pmi_months(df)
+        total_monthly = monthly_payment + pmi_start if pmi_start else monthly_payment
 
-    st.markdown(f"- **Home Price**: ${home_price:,.0f}")
-    st.markdown(f"- **Down Payment**: ${down_payment:,.0f} ({dp_pct:.2f}%)")
-    st.markdown(f"- **Loan Amount**: ${home_price - down_payment:,.0f}")
-    st.markdown(f"- **Interest Rate**: {rate * 100:.2f}%")
-    st.markdown(f"- **Discount Points**: {discount_points}")
-    st.markdown(f"- **Closing Cost**: ${closing_cost:,.2f}")
-    st.markdown(f"- **PMI Rate**: {pmi_rate * 100:.2f}%")
-    if pmi_start:
-        st.markdown(f"- **PMI (Monthly \\$ Estimate)**: ${pmi_start:,.2f}")
-    else:
-        st.markdown("- **PMI (Monthly \\$ Estimate)**: $0.00")
-    st.markdown(f"- **Total Number of PMI Months**: {pmi_months}")
-    st.markdown(f"- **P&I Monthly Payment**: ${monthly_payment:,.2f}")
-    st.markdown(f"- **Total Monthly Payment**: ${total_monthly:,.2f}")
+        st.markdown(f"- **Home Price**: ${home_price:,.0f}")
+        st.markdown(f"- **Down Payment**: ${down_payment:,.0f} ({dp_pct:.2f}%)")
+        st.markdown(f"- **Loan Amount**: ${home_price - down_payment:,.0f}")
+        st.markdown(f"- **Interest Rate**: {rate * 100:.2f}%")
+        st.markdown(f"- **Discount Points**: {discount_points}")
+        st.markdown(f"- **Closing Cost**: ${closing_cost:,.2f}")
+        st.markdown(f"- **PMI Rate**: {pmi_rate * 100:.2f}%")
+        if pmi_start:
+            st.markdown(f"- **PMI (Monthly \\$ Estimate)**: ${pmi_start:,.2f}")
+        else:
+            st.markdown("- **PMI (Monthly \\$ Estimate)**: $0.00")
+        st.markdown(f"- **Total Number of PMI Months**: {pmi_months}")
+        st.markdown(f"- **P&I Monthly Payment**: ${monthly_payment:,.2f}")
+        st.markdown(f"- **Total Monthly Payment**: ${total_monthly:,.2f}")
 
-col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-with col1:
-    pmi_a_start = (loan_amount_a * pmi_rate / 12) if loan_amount_a and (loan_amount_a / home_price) > 0.80 else 0
-    display_loan_details("Loan A", home_price, down_payment_a, rate_a, discount_points_a, extra_costs_a, pmi_rate, pmi_a_start, monthly_payment_a, loan_a_df)
+    with col1:
+        pmi_a_start = (loan_amount_a * pmi_rate / 12) if loan_amount_a and home_price and (loan_amount_a / home_price) > 0.80 else 0
+        display_loan_details("Loan A", home_price, down_payment_a, rate_a, discount_points_a, extra_costs_a, pmi_rate, pmi_a_start, monthly_payment_a, loan_a_df)
 
-with col2:
-    pmi_b_start = (loan_amount_b * pmi_rate / 12) if loan_amount_b and (loan_amount_b / home_price) > 0.80 else 0
-    display_loan_details("Loan B", home_price, down_payment_b, discount_rate_b, discount_points_b, extra_costs_b, pmi_rate, pmi_b_start, monthly_payment_b, loan_b_df)
+    with col2:
+        pmi_b_start = (loan_amount_b * pmi_rate / 12) if loan_amount_b and home_price and (loan_amount_b / home_price) > 0.80 else 0
+        display_loan_details("Loan B", home_price, down_payment_b, discount_rate_b, discount_points_b, extra_costs_b, pmi_rate, pmi_b_start, monthly_payment_b, loan_b_df)
 
-st.subheader("📊 Loan Performance Over Time")
-st.dataframe(summary_final.set_index("Year"))
+    st.subheader("📊 Loan Performance Over Time")
+    st.dataframe(summary_final.set_index("Year"))
 
-# --- Footer ---
+# --- Footer --- (This is outside the 'if can_display_results' block, so it always shows)
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; font-size: 14px;">
@@ -334,4 +364,3 @@ st.markdown("""
     <p><em>This tool is for informational purposes only and should not be considered financial advice.</em></p>
 </div>
 """, unsafe_allow_html=True)
-
